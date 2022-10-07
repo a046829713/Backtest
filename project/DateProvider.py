@@ -1,31 +1,41 @@
 import pandas as pd
-import Datatool
+import vectorbt as vbt
+import matplotlib.pyplot as plt
+from strategy import Strategy
+
+df = pd.read_csv('project\BTCUSDT-30Minute-Trade.txt')
+df['Datetime'] = pd.to_datetime(df['Datetime'])
+df.set_index('Datetime', inplace=True)
 
 
-def get_data(freq: int):
-    """將binance 的文字檔資料轉換,並且將其保存下來
+# strategy==================
+@Strategy()
+def sma_strategy(df):
+    close = df['Close']
 
-    Args:
-        freq (int): 5
-    """
-    # 讀取資料(UTC原始資料)
-    df = pd.read_csv("project\BTCUSDT-Minute-Trade.txt")
-    df["Datetime"] = df["Date"] + " " + df["Time"]
-    df["Datetime"] = df['Datetime'].apply(Datatool.Datatool.changetime)
+    n1 = 200
+    n2 = 600
 
-    df.set_index("Datetime", inplace=True)
-    df.drop(['Date', 'Time'], axis=1, inplace=True)
+    sma1 = close.rolling(int(n1)).mean()
+    sma2 = close.rolling(int(n2)).mean()
 
-    df = df.resample(rule=f'{freq}min', label="right", closed='right').agg({'Open': 'first',
-                                                                     'High': 'max',
-                                                                      'Low': 'min',
-                                                                      'Close': 'last',
-                                                                      'TotalVolume': 'sum'})
+    entries = (sma1 > sma2) & (sma1.shift() < sma2.shift())
+    exits = (sma1 < sma2) & (sma1.shift() > sma2.shift())
+    return entries, exits
 
-    # 處理成台灣時間之資料
-    df.to_csv(f"project\BTCUSDT-{freq}Minute-Trade.txt")
+sma_strategy.backtest(df, plot=True)
+# Portfolio = vbt.Portfolio.from_signals(close, entries, exits, size=1)
+# orders = Portfolio.orders
 
+# print(orders.buy.count())
+# print(orders.sell.count())
+# print(orders.stats())
+# print(Portfolio.annual_returns())
 
 
-if __name__ == '__main__':
-    get_data(30)
+# Portfolio.drawdown().plot()
+# Portfolio.cumulative_returns().plot()
+
+
+# print(Portfolio.positions())
+# plt.show()
